@@ -95,8 +95,6 @@ uint64_t XROTR64 (uint64_t v, uint32_t n)
   return shr64(v, n) | shl64(v, (64 - n));
 }
 
-#define THREEFISH_KEY_CONST 0x1BD11BDAA9FC1A22LL
-
 #define K(s) (((uint64_t*)key)[(s)])
 #define T(s) (((uint64_t*)tweak)[(s)])
 
@@ -129,7 +127,7 @@ void threefish_setkey(
 	
   ctx->t[2] = T(0) ^ T(1);
 	
-	ctx->k[4] = THREEFISH_KEY_CONST;
+	ctx->k[4] = 0x1BD11BDAA9FC1A22ULL;
   
 	for(i=0; i<4; ++i){
 		ctx->k[4] ^= K(i);
