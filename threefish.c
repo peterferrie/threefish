@@ -95,13 +95,10 @@ uint64_t XROTR64 (uint64_t v, uint32_t n)
   return shr64(v, n) | shl64(v, (64 - n));
 }
 
-#define K(s) (((uint64_t*)key)[(s)])
-#define T(s) (((uint64_t*)tweak)[(s)])
-
 #define B0 (((uint64_t*)data)[0])
 #define B1 (((uint64_t*)data)[1])
 
-void threefish_mix(void *data, uint8_t rot, int enc){
+void mix(void *data, uint8_t rot, int enc){
 	uint64_t x;
   
   if (enc==THREEFISH_ENCRYPT)
@@ -115,47 +112,64 @@ void threefish_mix(void *data, uint8_t rot, int enc){
   }
 }
 
+#define K(s) (((uint64_t*)key)[(s)])
+#define T(s) (((uint64_t*)tweak)[(s)])
+
 void threefish_setkey(
-    threefish_ctx_t *ctx,
+    threefish_ctx_t *c,
     const void *key, 
     const void *tweak)
 {
   uint8_t i;
   
-	memcpy(ctx->k, key,   4*8);
-  memcpy(ctx->t, tweak, 2*8);
+	memcpy(c->k, key,   4*8);
+  memcpy(c->t, tweak, 2*8);
 	
-  ctx->t[2] = T(0) ^ T(1);
+  c->t[2] = T(0) ^ T(1);
 	
-	ctx->k[4] = 0x1BD11BDAA9FC1A22ULL;
+	c->k[4] = 0x1BD11BDAA9FC1A22ULL;
   
 	for(i=0; i<4; ++i){
-		ctx->k[4] ^= K(i);
+		c->k[4] ^= K(i);
 	}
 }
 
 #define X(a) (((uint64_t*)data)[(a)])
 
-void permute_4(void *data){
+void permute(void *data){
 	uint64_t t;
-	t = X(1);
+  
+	t    = X(1);
 	X(1) = X(3);
 	X(3) = t;
 }
 
-// perform both addition and subtraction 
-// flag should be 0 for addition or 1 for subtraction
-#define ADDSUB(x, y, z, flag) \
-  ((x ^ -flag) + y + z) ^ -flag; \
-
-void add_key_4(void *data, const threefish_ctx_t *ctx, uint8_t s, uint64_t enc){
-  X(0) = ADDSUB(X(0), ctx->k[(s+0)%5], 0,               enc);
-	X(1) = ADDSUB(X(1), ctx->k[(s+1)%5], ctx->t[s%3],     enc);
-	X(2) = ADDSUB(X(2), ctx->k[(s+2)%5], ctx->t[(s+1)%3], enc);
-	X(3) = ADDSUB(X(3), ctx->k[(s+3)%5], s,               enc);
+// perform both addition and subtraction on x
+// enc should be 0 for addition or 1 for subtraction
+void addkey(
+    void *data, 
+    const threefish_ctx_t *c, 
+    uint8_t s, 
+    uint64_t enc)
+{
+  int i;
+  uint64_t x0, x1, x2;
+  
+  for (i=0; i<4; i++) {
+    x0 = X(i);
+    x1 = c->k[(s + i) % 5];
+    x2 = 0;
+    if (i==1) x2 = c->t[s % 3];
+    if (i==2) x2 = c->t[(s+1) % 3];
+    if (i==3) x2 = s;
+    X(i) = ((x0 ^ -enc) + x1 + x2) ^ -enc;
+  }
 }
 
-void threefish_encrypt(const threefish_ctx_t *ctx, void *data, uint32_t enc)
+void threefish_encrypt(
+    const threefish_ctx_t *c, 
+    void *data, 
+    uint32_t enc)
 {
 	uint8_t i=0,s=0, ofs=1;
   uint32_t x0, x1;
@@ -163,8 +177,9 @@ void threefish_encrypt(const threefish_ctx_t *ctx, void *data, uint32_t enc)
 	uint8_t r0[8] = {14, 52, 23,  5, 25, 46, 58, 32};
 	uint8_t r1[8] = {16, 57, 40, 37, 33, 12, 22, 32};
   
+  // r rotation constants if decrypting
   if (enc == THREEFISH_DECRYPT) {
-    s = 18;
+    s   = 18;
     ofs = -1;
     
     // r0
@@ -181,24 +196,23 @@ void threefish_encrypt(const threefish_ctx_t *ctx, void *data, uint32_t enc)
     ((uint32_t*)r1)[1] = _byteswap_ulong(x0);
     ((uint32_t*)r1)[0] = _byteswap_ulong(x1);  
   }
-  i=0;
-	do{
-		if(i % 4 == 0) {
-			add_key_4(data, ctx, s, enc);
+  for (i=0; i<72; i++)
+  {
+    if((i & 3) == 0) {
+			addkey(data, c, s, enc);
 			s += ofs;
 		}
     if (enc==THREEFISH_DECRYPT) {
-      permute_4(data);
+      permute(data);
     }
 		
-    threefish_mix(data, r0[i%8], enc);
-		threefish_mix((uint8_t*)data + 16, r1[i%8], enc);
+    mix (data, r0[i & 7], enc);
+		mix ((uint8_t*)data + 16, r1[i & 7], enc);
     
     if (enc==THREEFISH_ENCRYPT) {
-		  permute_4(data);
+		  permute(data);
     }
-		++i;
-	}while(i!=72);
-	add_key_4(data, ctx, s, enc);
+	}
+	addkey(data, c, s, enc);
 }
 
