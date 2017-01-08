@@ -6,7 +6,6 @@
 #include <string.h>
 
 #include "threefish.h"
-//#include "threefish_otte.h"
 
 uint64_t three_256_00_key[]    = { 0L, 0L, 0L, 0L };
 uint64_t three_256_00_input[]  = { 0L, 0L, 0L, 0L };
@@ -49,42 +48,14 @@ void print_bytes(char *s, void *p, int len)
   }
 }
  
-void reverse(void *data, int len)
-{
-  int i, j;
-  uint8_t *x=(uint8_t*)data;
-  uint8_t c;
-
-  for (j=len-1, i=0; i<len/2; --j, i++) {
-    c = x[j];
-    x[j] = x[i];
-    x[i] = c;
-  }
-}
 int main(void)
 {
   threefish_ctx_t ctx;
   int i;
   uint8_t t[32];
   
-  /*for (i=0; i<Nw; i++) {
-    three_256_01_input[i] = _byteswap_uint64(three_256_01_input[i]);
-  }
-  
-  for (i=0; i<Nw; i++) {
-    three_256_01_key[i] = _byteswap_uint64(three_256_01_key[i]);
-  }
-  
-  for (i=0; i<2; i++) {
-    three_256_01_tweak[i] = _byteswap_uint64(three_256_01_tweak[i]);
-  }*/
-  
   for (i=0; i<2; i++)
   {
-    //reverse(tv[i].key,   32);
-    //reverse(tv[i].input, 32);
-    //reverse(tv[i].tweak, 16);
-    
     memcpy (t, tv[i].input, 32);
     
     //print_bytes("Key", tv[i].key, 32);
