@@ -1,15 +1,15 @@
 
 
-Designers 	      Bruce Schneier, Niels Ferguson, 
+Designers         Bruce Schneier, Niels Ferguson, 
                   Stefan Lucks, Doug Whiting, 
                   Mihir Bellare, Tadayoshi Kohno, 
                   Jon Callas, Jesse Walker
             
-First published 	2008
-Related to 	      Blowfish, Twofish
-Key sizes 	      256, 512 or 1024 bits
-Block sizes 	    256, 512 or 1024 bits
-Rounds 	          72 (80 for 1024-bit block size)
+First published   2008
+Related to        Blowfish, Twofish
+Key sizes         256, 512 or 1024 bits
+Block sizes       256, 512 or 1024 bits
+Rounds            72 (80 for 1024-bit block size)
 
   Copyright (C) 2017 Odzhan
 

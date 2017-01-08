@@ -90,7 +90,7 @@ void permute(void *data)
   x[3] = t;
 }
 
-// perform both addition and subtraction data
+// perform both addition and subtraction on data
 // enc should be 0 for addition or 1 for subtraction
 void addkey(
     const threefish_ctx_t *c, 
@@ -110,6 +110,7 @@ void addkey(
     if (i==2) x2 = c->t[(s+1) % 3];
     if (i==3) x2 = s;
     
+    // 
     x[i] = ((x0 ^ -enc) + x1 + x2) ^ -enc;
   }
 }
@@ -133,10 +134,10 @@ void threefish_encrypt(
     // swap rotation constants if
     // decrypting
     for (i=0; i<4; i += 2) {
-      x0 = ((uint32_t*)rc)[i];
+      x0 = ((uint32_t*)rc)[i+0];
       x1 = ((uint32_t*)rc)[i+1];
       
-      ((uint32_t*)rc)[i]   = SWAP32(x1);
+      ((uint32_t*)rc)[i+0] = SWAP32(x1);
       ((uint32_t*)rc)[i+1] = SWAP32(x0);
     }
   }
@@ -150,15 +151,15 @@ void threefish_encrypt(
     }
 
     // permute if decrypting
-    if (enc==THREEFISH_DECRYPT) {
+    if (enc == THREEFISH_DECRYPT) {
       permute(data);
     }
     
-    // mix
+    // apply mixing function
     mix (data, rc, i, enc);
     
     // permute if encrypting
-    if (enc==THREEFISH_ENCRYPT) {
+    if (enc == THREEFISH_ENCRYPT) {
       permute(data);
     }
   }

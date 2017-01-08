@@ -38,7 +38,7 @@
 #ifdef _MSC_VER
 #include <intrin.h>
 #else
-#incude <x86intrin.h>  
+#include <x86intrin.h>  
 #endif  
 
 #define U8V(v)  ((uint8_t)(v)  & 0xFFU)
