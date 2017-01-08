@@ -33,85 +33,6 @@
 
 #include "threefish.h"
 
-// without shift functions, 32-bit compiler uses
-// external assembly functions
-uint64_t shl64 (uint64_t v, uint32_t n)
-{
-  union {
-    uint32_t v32[2];
-    uint64_t v64;
-  } r, t;
-  
-  r.v64 = 0;
-  
-  if (n<64) {
-    t.v64 = v;
-    if (n==0) {
-      r.v64 = t.v64;
-    } else if (n<32) {
-      r.v32[0]  =  t.v32[0] << n; // shift low bits left by n
-      r.v32[1]  =  t.v32[1] << n; // shift upper bits left by n
-      r.v32[1] |= (t.v32[0] >> (32 - n));
-    } else {
-      r.v32[0]  = 0;
-      r.v32[1]  = (t.v32[0] << (n & 31));
-    }
-  }
-  return r.v64;
-}
-
-uint64_t shr64 (uint64_t v, uint32_t n)
-{
-  union {
-    uint32_t v32[2];
-    uint64_t v64;
-  } r, t;
-  
-  r.v64 = 0;
-  
-  if (n<64) {
-    t.v64 = v;
-    if (n==0) {
-      r.v64 = t.v64;
-    } else if (n<32) {
-      r.v32[0]  =  t.v32[0] >> n; // shift low bits right by n
-      r.v32[1]  =  t.v32[1] >> n; // shift upper bits right by n
-      r.v32[0] |= (t.v32[1] << (32 - n));
-    } else {
-      r.v32[1]  = 0;
-      r.v32[0]  = (t.v32[1] >> (n & 31));
-    }
-  }
-  return r.v64;
-}
-
-uint64_t XROTL64 (uint64_t v, uint32_t n) 
-{
-  return shl64(v, n) | shr64(v, (64 - n));
-}
-
-uint64_t XROTR64 (uint64_t v, uint32_t n) 
-{
-  return shr64(v, n) | shl64(v, (64 - n));
-}
-
-#define B0 (((uint64_t*)data)[0])
-#define B1 (((uint64_t*)data)[1])
-
-void mix(void *data, uint8_t rot, int enc){
-	uint64_t x;
-  
-  if (enc==THREEFISH_ENCRYPT)
-  {
-    B0 += B1;
-    B1 = XROTL64(B1, rot) ^ B0;
-  } else {
-    B1 ^= B0;
-    B1 = XROTR64(B1, rot);
-    B0 -= B1;    
-  }
-}
-
 #define K(s) (((uint64_t*)key)[(s)])
 #define T(s) (((uint64_t*)tweak)[(s)])
 
@@ -122,8 +43,8 @@ void threefish_setkey(
 {
   uint8_t i;
   
-	memcpy(c->k, key,   4*8);
-  memcpy(c->t, tweak, 2*8);
+	memcpy((void*)c->k, key,   4*8);
+  memcpy((void*)c->t, tweak, 2*8);
 	
   c->t[2] = T(0) ^ T(1);
 	
@@ -135,6 +56,27 @@ void threefish_setkey(
 }
 
 #define X(a) (((uint64_t*)data)[(a)])
+
+void mix(void *data, int rnd, int enc)
+{
+	int     i;
+	uint8_t r0[16] = {14, 52, 23,  5, 25, 46, 58, 32, 16, 57, 40, 37, 33, 12, 22, 32};
+  uint8_t r1[16] = {32, 58, 46, 25,  5, 23, 52, 14, 32, 22, 12, 33, 37, 40, 57, 16};
+  
+  for (i=0; i<4; i += 2)
+  {
+    if (enc==THREEFISH_ENCRYPT)
+    {
+      X(i)   += X(i+1);
+      X(i+1)  = ROTL64(X(i+1), r0[(rnd & 7) + (i * 4)]);
+      X(i+1) ^= X(i);
+    } else {
+      X(i+1) ^= X(i);
+      X(i+1)  = ROTR64(X(i+1), r1[(rnd & 7) + (i * 4)]);
+      X(i)   -= X(i+1);    
+    }
+  }
+}
 
 void permute(void *data){
 	uint64_t t;
@@ -171,30 +113,12 @@ void threefish_encrypt(
     void *data, 
     uint32_t enc)
 {
-	uint8_t i=0,s=0, ofs=1;
-  uint32_t x0, x1;
-  
-	uint8_t r0[8] = {14, 52, 23,  5, 25, 46, 58, 32};
-	uint8_t r1[8] = {16, 57, 40, 37, 33, 12, 22, 32};
-  
+	uint8_t i, s=0, ofs=1;
+
   // r rotation constants if decrypting
   if (enc == THREEFISH_DECRYPT) {
     s   = 18;
-    ofs = -1;
-    
-    // r0
-    x0 = ((uint32_t*)r0)[0];
-    x1 = ((uint32_t*)r0)[1];
-    
-    ((uint32_t*)r0)[1] = _byteswap_ulong(x0);
-    ((uint32_t*)r0)[0] = _byteswap_ulong(x1);
-    
-    // r1
-    x0 = ((uint32_t*)r1)[0];
-    x1 = ((uint32_t*)r1)[1];
-    
-    ((uint32_t*)r1)[1] = _byteswap_ulong(x0);
-    ((uint32_t*)r1)[0] = _byteswap_ulong(x1);  
+    ofs = ~0;
   }
   for (i=0; i<72; i++)
   {
@@ -206,8 +130,7 @@ void threefish_encrypt(
       permute(data);
     }
 		
-    mix (data, r0[i & 7], enc);
-		mix ((uint8_t*)data + 16, r1[i & 7], enc);
+    mix (data, i, enc);
     
     if (enc==THREEFISH_ENCRYPT) {
 		  permute(data);
