@@ -55,56 +55,61 @@ void threefish_setkey(
 	}
 }
 
-#define X(a) (((uint64_t*)data)[(a)])
-
 void mix(void *data, int rnd, int enc)
 {
 	int     i;
+  uint64_t *x;
 	uint8_t r0[16] = {14, 52, 23,  5, 25, 46, 58, 32, 16, 57, 40, 37, 33, 12, 22, 32};
   uint8_t r1[16] = {32, 58, 46, 25,  5, 23, 52, 14, 32, 22, 12, 33, 37, 40, 57, 16};
+  
+  x = (uint64_t*)data;
   
   for (i=0; i<4; i += 2)
   {
     if (enc==THREEFISH_ENCRYPT)
     {
-      X(i)   += X(i+1);
-      X(i+1)  = ROTL64(X(i+1), r0[(rnd & 7) + (i * 4)]);
-      X(i+1) ^= X(i);
+      x[i]   += x[i+1];
+      x[i+1]  = ROTL64(x[i+1], r0[(rnd & 7) + (i * 4)]);
+      x[i+1] ^= x[i];
     } else {
-      X(i+1) ^= X(i);
-      X(i+1)  = ROTR64(X(i+1), r1[(rnd & 7) + (i * 4)]);
-      X(i)   -= X(i+1);    
+      x[i+1] ^= x[i];
+      x[i+1]  = ROTR64(x[i+1], r1[(rnd & 7) + (i * 4)]);
+      x[i]   -= x[i+1];    
     }
   }
 }
 
-void permute(void *data){
+void permute(void *data)
+{
 	uint64_t t;
+  uint64_t *x=(uint64_t*)data;
   
-	t    = X(1);
-	X(1) = X(3);
-	X(3) = t;
+	t    = x[1];
+	x[1] = x[3];
+	x[3] = t;
 }
 
 // perform both addition and subtraction on x
 // enc should be 0 for addition or 1 for subtraction
 void addkey(
-    void *data, 
     const threefish_ctx_t *c, 
-    uint8_t s, 
+    void *data, uint8_t s, 
     uint64_t enc)
 {
   int i;
   uint64_t x0, x1, x2;
+  uint64_t *x=(uint64_t*)data;
   
   for (i=0; i<4; i++) {
-    x0 = X(i);
+    x0 = x[i];
     x1 = c->k[(s + i) % 5];
     x2 = 0;
+    
     if (i==1) x2 = c->t[s % 3];
     if (i==2) x2 = c->t[(s+1) % 3];
     if (i==3) x2 = s;
-    X(i) = ((x0 ^ -enc) + x1 + x2) ^ -enc;
+    
+    x[i] = ((x0 ^ -enc) + x1 + x2) ^ -enc;
   }
 }
 
@@ -123,7 +128,7 @@ void threefish_encrypt(
   for (i=0; i<72; i++)
   {
     if((i & 3) == 0) {
-			addkey(data, c, s, enc);
+			addkey(c, data, s, enc);
 			s += ofs;
 		}
     if (enc==THREEFISH_DECRYPT) {
@@ -136,6 +141,6 @@ void threefish_encrypt(
 		  permute(data);
     }
 	}
-	addkey(data, c, s, enc);
+	addkey(c, data, s, enc);
 }
 
