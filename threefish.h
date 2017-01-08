@@ -101,8 +101,8 @@
    
 // for 256-bit keys
 typedef struct{
-	uint64_t k[8];
-	uint64_t t[4];
+  uint64_t k[8];
+  uint64_t t[4];
 } threefish_ctx_t;
 
 #ifdef __cplusplus

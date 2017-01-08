@@ -43,53 +43,54 @@ void threefish_setkey(
 {
   uint8_t i;
   
-	memcpy((void*)c->k, key,   4*8);
-  memcpy((void*)c->t, tweak, 2*8);
-	
-  c->t[2] = T(0) ^ T(1);
-	
-	c->k[4] = 0x1BD11BDAA9FC1A22ULL;
+  memcpy((void*)c->k, key,   32);
+  memcpy((void*)c->t, tweak, 16);
   
-	for(i=0; i<4; ++i){
-		c->k[4] ^= K(i);
-	}
+  c->t[2] = T(0) ^ T(1);
+  
+  c->k[4] = 0x1BD11BDAA9FC1A22ULL;
+  
+  for(i=0; i<4; ++i){
+    c->k[4] ^= K(i);
+  }
 }
 
-void mix(void *data, int rnd, int enc)
+void mix(void *data, uint8_t rc[], int rnd, int enc)
 {
-	int     i;
+  int     i;
   uint64_t *x;
-	uint8_t r0[16] = {14, 52, 23,  5, 25, 46, 58, 32, 16, 57, 40, 37, 33, 12, 22, 32};
-  uint8_t r1[16] = {32, 58, 46, 25,  5, 23, 52, 14, 32, 22, 12, 33, 37, 40, 57, 16};
+  uint8_t  r;
   
   x = (uint64_t*)data;
   
   for (i=0; i<4; i += 2)
   {
-    if (enc==THREEFISH_ENCRYPT)
+    r = rc[(rnd & 7) + (i * 4)];
+
+    if (enc==THREEFISH_DECRYPT)
     {
-      x[i]   += x[i+1];
-      x[i+1]  = ROTL64(x[i+1], r0[(rnd & 7) + (i * 4)]);
       x[i+1] ^= x[i];
+      x[i+1]  = ROTR64(x[i+1], r);
+      x[i]   -= x[i+1];      
     } else {
-      x[i+1] ^= x[i];
-      x[i+1]  = ROTR64(x[i+1], r1[(rnd & 7) + (i * 4)]);
-      x[i]   -= x[i+1];    
+      x[i]   += x[i+1];
+      x[i+1]  = ROTL64(x[i+1], r);
+      x[i+1] ^= x[i];    
     }
   }
 }
 
 void permute(void *data)
 {
-	uint64_t t;
+  uint64_t t;
   uint64_t *x=(uint64_t*)data;
   
-	t    = x[1];
-	x[1] = x[3];
-	x[3] = t;
+  t    = x[1];
+  x[1] = x[3];
+  x[3] = t;
 }
 
-// perform both addition and subtraction on x
+// perform both addition and subtraction data
 // enc should be 0 for addition or 1 for subtraction
 void addkey(
     const threefish_ctx_t *c, 
@@ -118,29 +119,50 @@ void threefish_encrypt(
     void *data, 
     uint32_t enc)
 {
-	uint8_t i, s=0, ofs=1;
+  uint8_t i, s=0, ofs=1;
+  uint32_t x0, x1;
+  
+  uint8_t rc[16] = 
+  { 14, 52, 23,  5, 25, 46, 58, 32, 
+    16, 57, 40, 37, 33, 12, 22, 32};
 
-  // r rotation constants if decrypting
   if (enc == THREEFISH_DECRYPT) {
     s   = 18;
     ofs = ~0;
+    
+    // swap rotation constants if
+    // decrypting
+    for (i=0; i<4; i += 2) {
+      x0 = ((uint32_t*)rc)[i];
+      x1 = ((uint32_t*)rc)[i+1];
+      
+      ((uint32_t*)rc)[i]   = SWAP32(x1);
+      ((uint32_t*)rc)[i+1] = SWAP32(x0);
+    }
   }
+  // apply 72 rounds
   for (i=0; i<72; i++)
   {
+    // add key every 4 rounds
     if((i & 3) == 0) {
-			addkey(c, data, s, enc);
-			s += ofs;
-		}
+      addkey(c, data, s, enc);
+      s += ofs;
+    }
+
+    // permute if decrypting
     if (enc==THREEFISH_DECRYPT) {
       permute(data);
     }
-		
-    mix (data, i, enc);
     
+    // mix
+    mix (data, rc, i, enc);
+    
+    // permute if encrypting
     if (enc==THREEFISH_ENCRYPT) {
-		  permute(data);
+      permute(data);
     }
-	}
-	addkey(c, data, s, enc);
+  }
+  // add key
+  addkey(c, data, s, enc);
 }
 
