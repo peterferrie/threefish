@@ -54,11 +54,9 @@ void threefish_setkey(
   c->t[2] = T(0) ^ T(1);  
 }
 
-void mix(
-    void *data, 
+void mix(void *data, 
     uint8_t rc[], 
-    int rnd, 
-    int enc)
+    int rnd, int enc)
 {
   int     i;
   uint64_t *x;
