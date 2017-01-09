@@ -22,46 +22,42 @@ _threefish_setkey PROC					; COMDAT
 	mov	eax, DWORD PTR _c$[esp-4]
 ; Line 47
 	mov	edx, DWORD PTR _tweak$[esp-4]
-	push	ebx
-	mov	ebx, DWORD PTR _key$[esp]
 	push	esi
+	mov	esi, DWORD PTR _key$[esp]
 	push	edi
 	push	32					; 00000020H
 	pop	ecx
 	push	16					; 00000010H
 	mov	edi, eax
-	mov	esi, ebx
 	rep movsb
 	pop	ecx
-	lea	edi, DWORD PTR [eax+64]
+	lea	edi, DWORD PTR [eax+40]
 	mov	esi, edx
 	rep movsb
-; Line 51
+	mov	ecx, DWORD PTR _key$[esp+4]
 	push	4
+; Line 49
 	mov	DWORD PTR [eax+32], -1443096030		; a9fc1a22H
 	mov	DWORD PTR [eax+36], 466688986		; 1bd11bdaH
 	pop	esi
-	lea	ecx, DWORD PTR [ebx+24]
 $LL3@threefish_:
 ; Line 52
 	mov	edi, DWORD PTR [ecx]
 	xor	DWORD PTR [eax+32], edi
 	mov	edi, DWORD PTR [ecx+4]
 	xor	DWORD PTR [eax+36], edi
+	add	ecx, 8
 	dec	esi
-	sub	ecx, 8
-	test	esi, esi
-	jg	SHORT $LL3@threefish_
+	jne	SHORT $LL3@threefish_
 ; Line 54
 	mov	esi, DWORD PTR [edx+12]
 	mov	ecx, DWORD PTR [edx+8]
 	xor	esi, DWORD PTR [edx+4]
 	xor	ecx, DWORD PTR [edx]
 	pop	edi
-	mov	DWORD PTR [eax+84], esi
+	mov	DWORD PTR [eax+60], esi
+	mov	DWORD PTR [eax+56], ecx
 	pop	esi
-	mov	DWORD PTR [eax+80], ecx
-	pop	ebx
 ; Line 55
 	ret	0
 _threefish_setkey ENDP
@@ -73,7 +69,7 @@ _TEXT	SEGMENT
 tv246 = -24						; size = 8
 tv459 = -16						; size = 4
 tv456 = -12						; size = 4
-tv147 = -8						; size = 4
+tv154 = -8						; size = 4
 tv436 = -4						; size = 4
 tv394 = 8						; size = 4
 _data$ = 8						; size = 4
@@ -82,11 +78,11 @@ _rc$ = 12						; size = 4
 _rnd$ = 16						; size = 4
 _enc$ = 20						; size = 4
 _mix	PROC						; COMDAT
-; Line 58
+; Line 62
 	push	ebp
 	mov	ebp, esp
 	sub	esp, 24					; 00000018H
-; Line 65
+; Line 69
 	mov	eax, DWORD PTR _data$[ebp]
 	push	ebx
 	push	esi
@@ -95,19 +91,19 @@ _mix	PROC						; COMDAT
 	and	edi, 7
 	add	eax, 8
 	add	edi, DWORD PTR _rc$[ebp]
-	mov	DWORD PTR tv147[ebp], 2
+	mov	DWORD PTR tv154[ebp], 2
 	mov	DWORD PTR tv436[ebp], edi
 $LL5@mix:
-; Line 69
+; Line 73
 	cmp	DWORD PTR _enc$[ebp], 1
 	mov	bl, BYTE PTR [edi]
 	jne	SHORT $LN2@mix
-; Line 71
+; Line 75
 	mov	esi, DWORD PTR [eax-8]
 	mov	edi, DWORD PTR [eax-4]
 	xor	DWORD PTR [eax], esi
 	xor	DWORD PTR [eax+4], edi
-; Line 72
+; Line 76
 	mov	edx, DWORD PTR [eax]
 	mov	cl, 64					; 00000040H
 	sub	cl, bl
@@ -128,22 +124,22 @@ $LN14@mix:
 	shld	ebx, edx, cl
 	mov	edx, DWORD PTR tv246[ebp]
 $LN9@mix:
-; Line 73
+; Line 77
 	sub	esi, edx
 	sbb	edi, ebx
 	mov	DWORD PTR [eax-4], edi
-; Line 74
+; Line 78
 	mov	edi, DWORD PTR tv436[ebp]
 	mov	DWORD PTR [eax], edx
 	mov	DWORD PTR [eax+4], ebx
 	mov	DWORD PTR [eax-8], esi
 	jmp	SHORT $LN4@mix
 $LN2@mix:
-; Line 75
+; Line 79
 	mov	ecx, DWORD PTR [eax]
 	add	DWORD PTR [eax-8], ecx
 	mov	edx, DWORD PTR [eax+4]
-; Line 76
+; Line 80
 	mov	esi, ecx
 	adc	DWORD PTR [eax-4], edx
 	test	bl, 32					; 00000020H
@@ -160,7 +156,7 @@ $LN10@mix:
 	mov	esi, edi
 	mov	edi, DWORD PTR tv436[ebp]
 $LN11@mix:
-; Line 77
+; Line 81
 	mov	ecx, DWORD PTR [eax-8]
 	mov	DWORD PTR [eax], esi
 	xor	DWORD PTR [eax], ecx
@@ -168,16 +164,16 @@ $LN11@mix:
 	mov	DWORD PTR [eax+4], edx
 	xor	DWORD PTR [eax+4], ecx
 $LN4@mix:
-; Line 65
+; Line 69
 	add	edi, 8
 	add	eax, 16					; 00000010H
-	dec	DWORD PTR tv147[ebp]
+	dec	DWORD PTR tv154[ebp]
 	mov	DWORD PTR tv436[ebp], edi
 	jne	$LL5@mix
 	pop	edi
 	pop	esi
 	pop	ebx
-; Line 80
+; Line 84
 	leave
 	ret	0
 _mix	ENDP
@@ -188,21 +184,21 @@ PUBLIC	_permute
 _TEXT	SEGMENT
 _data$ = 8						; size = 4
 _permute PROC						; COMDAT
-; Line 87
+; Line 91
 	mov	eax, DWORD PTR _data$[esp-4]
 	mov	ecx, DWORD PTR [eax+8]
 	mov	edx, DWORD PTR [eax+12]
 	push	esi
-; Line 88
+; Line 92
 	mov	esi, DWORD PTR [eax+24]
 	mov	DWORD PTR [eax+8], esi
 	mov	esi, DWORD PTR [eax+28]
 	mov	DWORD PTR [eax+12], esi
-; Line 89
+; Line 93
 	mov	DWORD PTR [eax+24], ecx
 	mov	DWORD PTR [eax+28], edx
 	pop	esi
-; Line 90
+; Line 94
 	ret	0
 _permute ENDP
 _TEXT	ENDS
@@ -218,11 +214,11 @@ _data$ = 12						; size = 4
 _s$ = 16						; size = 1
 _enc$ = 20						; size = 8
 _addkey	PROC						; COMDAT
-; Line 98
+; Line 102
 	push	ebp
 	mov	ebp, esp
 	sub	esp, 24					; 00000018H
-; Line 103
+; Line 107
 	mov	eax, DWORD PTR _enc$[ebp]
 	push	ebx
 	push	esi
@@ -236,24 +232,24 @@ _addkey	PROC						; COMDAT
 	neg	eax
 	mov	DWORD PTR tv189[ebp+4], eax
 $LL6@addkey:
-; Line 104
+; Line 108
 	mov	eax, DWORD PTR _data$[ebp]
 	lea	ecx, DWORD PTR [eax+edi*8]
-; Line 105
+; Line 109
 	movzx	eax, BYTE PTR _s$[ebp]
 	add	eax, edi
 	cdq
 	push	5
 	pop	ebx
 	idiv	ebx
-; Line 106
+; Line 110
 	and	DWORD PTR _x2$[ebp], 0
 	and	DWORD PTR _x2$[ebp+4], 0
 	mov	eax, DWORD PTR [esi+edx*8]
 	mov	DWORD PTR _x1$[ebp], eax
 	mov	eax, DWORD PTR [esi+edx*8+4]
 	mov	DWORD PTR _x1$[ebp+4], eax
-; Line 108
+; Line 112
 	cmp	edi, 1
 	jne	SHORT $LN3@addkey
 	movzx	eax, BYTE PTR _s$[ebp]
@@ -261,12 +257,12 @@ $LL6@addkey:
 	push	3
 	pop	ebx
 	idiv	ebx
-	mov	eax, DWORD PTR [esi+edx*8+64]
+	mov	eax, DWORD PTR [esi+edx*8+40]
 	mov	DWORD PTR _x2$[ebp], eax
-	mov	eax, DWORD PTR [esi+edx*8+68]
+	mov	eax, DWORD PTR [esi+edx*8+44]
 	mov	DWORD PTR _x2$[ebp+4], eax
 $LN3@addkey:
-; Line 109
+; Line 113
 	cmp	edi, 2
 	jne	SHORT $LN2@addkey
 	movzx	eax, BYTE PTR _s$[ebp]
@@ -275,12 +271,12 @@ $LN3@addkey:
 	push	3
 	pop	ebx
 	idiv	ebx
-	mov	eax, DWORD PTR [esi+edx*8+64]
+	mov	eax, DWORD PTR [esi+edx*8+40]
 	mov	DWORD PTR _x2$[ebp], eax
-	mov	eax, DWORD PTR [esi+edx*8+68]
+	mov	eax, DWORD PTR [esi+edx*8+44]
 	mov	DWORD PTR _x2$[ebp+4], eax
 $LN2@addkey:
-; Line 110
+; Line 114
 	cmp	edi, 3
 	jne	SHORT $LN1@addkey
 	movzx	eax, BYTE PTR _s$[ebp]
@@ -288,7 +284,7 @@ $LN2@addkey:
 	mov	DWORD PTR _x2$[ebp], eax
 	mov	DWORD PTR _x2$[ebp+4], edx
 $LN1@addkey:
-; Line 113
+; Line 117
 	mov	eax, DWORD PTR tv189[ebp]
 	xor	eax, DWORD PTR [ecx]
 	mov	edx, DWORD PTR tv189[ebp+4]
@@ -307,7 +303,7 @@ $LN1@addkey:
 	pop	edi
 	pop	esi
 	pop	ebx
-; Line 115
+; Line 119
 	leave
 	ret	0
 _addkey	ENDP
@@ -324,14 +320,14 @@ _data$ = 12						; size = 4
 _enc$ = 16						; size = 4
 _i$ = 19						; size = 1
 _threefish_encrypt PROC					; COMDAT
-; Line 121
+; Line 125
 	push	ebp
 	mov	ebp, esp
 	sub	esp, 24					; 00000018H
 	push	ebx
 	push	esi
 	push	edi
-; Line 129
+; Line 133
 	mov	edi, DWORD PTR _enc$[ebp]
 	mov	BYTE PTR _s$[ebp], 0
 	mov	bl, 1
@@ -341,20 +337,20 @@ _threefish_encrypt PROC					; COMDAT
 	mov	DWORD PTR _rc$[ebp+12], 538315809	; 20160c21H
 	cmp	edi, 1
 	jne	SHORT $LN7@threefish_@2
-; Line 130
+; Line 134
 	push	2
 	mov	BYTE PTR _s$[ebp], 18			; 00000012H
-; Line 131
+; Line 135
 	or	bl, 255					; 000000ffH
 	lea	eax, DWORD PTR _rc$[ebp+4]
 	pop	edx
 $LL9@threefish_@2:
-; Line 136
+; Line 140
 	mov	ecx, DWORD PTR [eax-4]
-; Line 139
+; Line 143
 	mov	esi, DWORD PTR [eax]
 	bswap	esi
-; Line 140
+; Line 144
 	bswap	ecx
 	mov	DWORD PTR [eax-4], esi
 	mov	DWORD PTR [eax], ecx
@@ -362,15 +358,15 @@ $LL9@threefish_@2:
 	dec	edx
 	jne	SHORT $LL9@threefish_@2
 $LN7@threefish_@2:
-; Line 144
+; Line 148
 	and	DWORD PTR tv392[ebp], 0
 	mov	esi, DWORD PTR _data$[ebp]
 	mov	BYTE PTR _i$[ebp], 0
 $LL21@threefish_@2:
-; Line 147
+; Line 151
 	test	BYTE PTR _i$[ebp], 3
 	jne	SHORT $LN3@threefish_@2
-; Line 148
+; Line 152
 	push	0
 	push	edi
 	push	DWORD PTR _s$[ebp]
@@ -378,13 +374,13 @@ $LL21@threefish_@2:
 	push	DWORD PTR _c$[ebp]
 	call	_addkey
 	add	esp, 20					; 00000014H
-; Line 149
+; Line 153
 	add	BYTE PTR _s$[ebp], bl
 $LN3@threefish_@2:
-; Line 153
+; Line 157
 	cmp	edi, 1
 	jne	SHORT $LN13@threefish_@2
-; Line 154
+; Line 158
 	mov	edx, DWORD PTR [esi+24]
 	mov	eax, DWORD PTR [esi+8]
 	mov	ecx, DWORD PTR [esi+12]
@@ -394,7 +390,7 @@ $LN3@threefish_@2:
 	mov	DWORD PTR [esi+24], eax
 	mov	DWORD PTR [esi+28], ecx
 $LN13@threefish_@2:
-; Line 158
+; Line 162
 	push	edi
 	push	DWORD PTR tv392[ebp]
 	lea	eax, DWORD PTR _rc$[ebp]
@@ -402,10 +398,10 @@ $LN13@threefish_@2:
 	push	esi
 	call	_mix
 	add	esp, 16					; 00000010H
-; Line 161
+; Line 165
 	test	edi, edi
 	jne	SHORT $LN5@threefish_@2
-; Line 162
+; Line 166
 	mov	edx, DWORD PTR [esi+24]
 	mov	eax, DWORD PTR [esi+8]
 	mov	ecx, DWORD PTR [esi+12]
@@ -415,12 +411,12 @@ $LN13@threefish_@2:
 	mov	DWORD PTR [esi+24], eax
 	mov	DWORD PTR [esi+28], ecx
 $LN5@threefish_@2:
-; Line 144
+; Line 148
 	inc	BYTE PTR _i$[ebp]
 	inc	DWORD PTR tv392[ebp]
 	cmp	BYTE PTR _i$[ebp], 72			; 00000048H
 	jb	SHORT $LL21@threefish_@2
-; Line 166
+; Line 170
 	push	0
 	push	edi
 	push	DWORD PTR _s$[ebp]
@@ -431,7 +427,7 @@ $LN5@threefish_@2:
 	pop	edi
 	pop	esi
 	pop	ebx
-; Line 167
+; Line 171
 	leave
 	ret	0
 _threefish_encrypt ENDP

@@ -41,20 +41,24 @@ void threefish_setkey(
     const void *key, 
     const void *tweak)
 {
-  int i;
+  uint8_t i;
   
   memcpy((void*)c->k, key,   32);
   memcpy((void*)c->t, tweak, 16);
   
   c->k[4] = 0x1BD11BDAA9FC1A22ULL;
   
-  for(i=4; i>0; i--){
-    c->k[4] ^= K(i-1);
+  for(i=0; i<4; i++){
+    c->k[4] ^= K(i);
   }
   c->t[2] = T(0) ^ T(1);  
 }
 
-void mix(void *data, uint8_t rc[], int rnd, int enc)
+void mix(
+    void *data, 
+    uint8_t rc[], 
+    int rnd, 
+    int enc)
 {
   int     i;
   uint64_t *x;
@@ -69,7 +73,7 @@ void mix(void *data, uint8_t rc[], int rnd, int enc)
     if (enc==THREEFISH_DECRYPT)
     {
       x[i+1] ^= x[i];
-      x[i+1]  = ROTL64(x[i+1], 64-r);
+      x[i+1]  = ROTL64(x[i+1], -(r-64));
       x[i]   -= x[i+1];      
     } else {
       x[i]   += x[i+1];
@@ -109,7 +113,7 @@ void addkey(
     if (i==2) x2 = c->t[(s+1) % 3];
     if (i==3) x2 = s;
     
-    // 
+    // add or subtract depending on enc
     x[i] = ((x0 ^ -enc) + x1 + x2) ^ -enc;
   }
 }
@@ -135,7 +139,7 @@ void threefish_encrypt(
     for (i=0; i<4; i += 2) {
       x0 = ((uint32_t*)rc)[i+0];
       x1 = ((uint32_t*)rc)[i+1];
-      
+
       ((uint32_t*)rc)[i+0] = SWAP32(x1);
       ((uint32_t*)rc)[i+1] = SWAP32(x0);
     }

@@ -64,7 +64,7 @@ int main(void)
     
     memset (&ctx, 0, sizeof (ctx));
     //printf ("\n\nSetting up key for test # %i", (i+1));
-    threefish_setkey(&ctx, tv[i].key, tv[i].tweak);
+    threefish_setkeyx (&ctx, tv[i].key, tv[i].tweak);
     //print_bytes("CTX", &ctx, sizeof(ctx));
     
     //printf ("\nEncrypting plaintext");

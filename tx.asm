@@ -1,5 +1,5 @@
 ;
-;  Copyright © 2015 Odzhan, Peter Ferrie.
+;  Copyright © 2017 Odzhan, Peter Ferrie.
 ;
 ;  All Rights Reserved.
 ;
@@ -32,7 +32,7 @@
 ; -----------------------------------------------
 ; Threefish-256 block cipher in x86 assembly
 ;
-; size: 350 bytes
+; size: 365 bytes
 ;
 ; global calls use cdecl convention
 ;
@@ -40,6 +40,26 @@
 
     bits 32
 
+    %ifndef BIN
+      global _threefish_setkeyx
+      global _threefish_encryptx
+      global _permutex
+      global _mixx
+      global _addkeyx
+    %endif
+    
+struc pushad_t
+  _edi dd ?
+  _esi dd ?
+  _ebp dd ?
+  _esp dd ?
+  _ebx dd ?
+  _edx dd ?
+  _ecx dd ?
+  _eax dd ?
+  .size:
+endstruc
+    
 %define t0 mm0
 %define t1 mm1
     
@@ -52,65 +72,85 @@
 %define x6 mm6
 %define x7 mm7
     
-%define r eax
+%define r ebp
     
-threefish_setkey:
+threefish_setkeyx:
+_threefish_setkeyx:
     pushad
     lea    esi, [esp+32+4]
     lodsd
-    
-    push   0x1BD11BDA
-    push   0xA9FC1A22
-    movq   x4, [esp]
-    pop    eax
-    pop    eax
+    xchg   eax, edi          ; edi = ctx   
+    lodsd
+    xchg   eax, esi          ; esi = key
+    push   edi               ; save ctx 
     
     ; memcpy((void*)c->k, key,   32);
     push   8
     pop    ecx
     rep    movsd
+    scasd
+    scasd
     
     ; memcpy((void*)c->t, tweak, 16);
+    xchg   eax, esi
+    lodsd
+    xchg   eax, esi
     mov    cl, 4
     rep    movsd
+
+    pop    edi 
+    ; c->k[4] = 0x1BD11BDAA9FC1A22ULL;
+    mov    eax, 0xA9FC1A22
+    mov    ebx, 0x1BD11BDA
+    mov    cl, 4    
 tf_sk:
-    pxor   x4, [esi+8*ecx]
-    inc    ecx
-    cmp    cl, 4
-    jnz    tf_sk
+    xor    eax, [edi]
+    scasd
+    xor    ebx, [edi]
+    scasd
+    loop   tf_sk
     
-    pxor   t0, t1
-    movq   [ebx+2*8], t0
+    stosd
+    xchg   eax, ebx
+    stosd
+    movq   t0, [edi]
+    pxor   t0, [edi+8]
+    movq   [edi+16], t0
     popad
     ret
 
 rotl64:
-    movq   x6, x1
-    movd   x7, eax
-    psllq  x6, x7
-    psrlq  x1, x7
-    por    x1, x6
+    movd   x5, edi
+    neg    edi
+    add    edi, 64    
+    movd   x6, edi
+    movq   x7, x1
+    psllq  x7, x5
+    psrlq  x1, x6
+    por    x1, x7
     ret
     
 ; void mix(
 ;    void *data, 
 ;    uint8_t rc[], 
 ;    int rnd, int enc)
-mix:
+mixx:
+_mixx:
     pushad
     xor    eax, eax
-    cdq
 m_l0:    
-    movq   x0, [esi+edx*8]
-    movq   x1, [esi+edx*8]
+    movq   x0, [esi+eax*8]
+    movq   x1, [esi+eax*8+8]
     
     ; r = rc[(rnd & 7) + (i << 2)];
-    mov    edx, eax
-    movzx  r, byte[ebx+eax]
+    mov    edi, edx
+    and    edi, 7
+    lea    edi, [edi+eax*4] 
+    movzx  edi, byte[ebx+edi]
     jecxz  m_l1
     
-    sub    r, 64
-    neg    r
+    sub    edi, 64
+    neg    edi
     
     pxor   x1, x0
     call   rotl64
@@ -121,16 +161,17 @@ m_l1
     call   rotl64
     pxor   x1, x0
 m_l2:
-    movq   [esi+edx*8  ], x0    
-    movq   [esi+edx*8+8], x1    
-    add    dl, 2
-    cmp    dl, 4
+    movq   [esi+eax*8  ], x0    
+    movq   [esi+eax*8+8], x1    
+    add    al, 2
+    cmp    al, 4
     jnz    m_l0
     popad
     ret
     
 ; void permute(void *data)    
-permute:
+permutex:
+_permutex:
     movq   x0, [esi+1*8]
     movq   x1, [esi+3*8]
 
@@ -141,13 +182,15 @@ permute:
 ; void addkey(const threefish_ctx_t *c, 
 ;    void *data, uint8_t s, 
 ;    uint64_t enc)
-addkey:
+addkeyx:
+_addkeyx:
     pushad
+
     pxor    x3, x3           ; x3 = 0 
     jecxz   ak_l0
     
     pcmpeqb x3, x3           ; x3 = ~0
-    dec     ecx
+    dec     ecx              ; ecx = 0
 ak_l0:  
     push    5
     pop     ebp  
@@ -156,37 +199,40 @@ ak_l0:
     movq    x0, [esi+ecx*8]   
     
     ; x1 = c->k[(s + i) % 5];
-    lea     eax, [edi+ecx]    
+    lea     eax, [ebx+ecx]    
     cdq    
     idiv    ebp        
-    movq    x1, [ebx+edx*8]
-    
-    ; x2 = 0;
-    pxor    x2, x2
+    movq    x1, [edi+edx*8]
     
     dec     ebp
     dec     ebp    
     
-    ; if (i==1) x2 = c->t[s % 3];
-    mov     eax, edi
-    cdq
-    idiv    ebp
-    movq    x2, [ebx+edx*8]
+    pxor    x2, x2    
+    jecxz   ak_lx
     
-    ; if (i==2) x2 = c->t[(s+1) % 3];
-    mov     eax, edi
-    inc     eax
-    cdq
-    idiv    ebp
-    movq    x2, [ebx+edx*8]
-
     ; if (i==3) x2 = s;
-    movd    x2, edi
+    movd    x2, ebx
+    cmp     cl, 3
+    je      ak_lx
+
+    mov     eax, ebx
+    cdq
+    cmp     cl, 1
+    je      ak_lxx
+    inc     eax
+ak_lxx:    
+    idiv    ebp
     
+    ; if (i==1) x2 = c->t[s % 3];
+    ; if (i==2) x2 = c->t[(s+1) % 3];    
+    movq    x2, [edi+8*edx+40]
+ak_lx:    
+    ; x[i] = ((x0 ^ -enc) + x1 + x2) ^ -enc;
     pxor    x0, x3
     paddq   x0, x1
     paddq   x0, x2
     pxor    x0, x3
+    
     movq    [esi+ecx*8], x0
     
     inc     ecx
@@ -199,22 +245,31 @@ ak_l0:
 ;    const threefish_ctx_t *c, 
 ;    void *data, 
 ;    uint32_t enc)
-threefish_encrypt:
+threefish_encryptx:
+_threefish_encryptx
     pushad
     lea    esi, [esp+32+4]
     lodsd
-    xchg   ebx, eax    
+    xchg   edi, eax    
     lodsd
     push   eax
     lodsd
     cdq
     xchg   eax, ecx
     pop    esi
+    push   1
+    pop    eax
+    call   tf_lx
+    dd     0x0517340E, 0x203A2E19 
+    dd     0x25283910, 0x20160C21
+tf_lx:
+    pop    ebx
     jecxz  tf_l1
-    neg    ebp               ; evp = -1
+    
+    neg    eax               ; eax = -1
     pushad
-    ;mov    esi, [esp+_esp]
-    mov    edi, esi
+    mov    esi, ebx
+    mov    edi, ebx
 tf_l0:    
     lodsd
     xchg   eax, ebx
@@ -232,25 +287,25 @@ tf_l1:
     ; add key every 4 rounds
     test  dl, 3
     jnz   tf_l2
-    call  addkey
-    add   edi, ebp
+    call  addkeyx
+    add   ebp, eax
 tf_l2:    
     ; permute if decrypting
     jecxz tf_l3    
-    call  permute 
+    call  permutex
 tf_l3:    
     ; apply mixing function
-    call  mix
+    call  mixx
     ; permute if encrypting
     test  ecx, ecx
     jz    tf_l4
-    call  permute
+    call  permutex
 tf_l4:    
-    inc   eax                 
-    cmp   al, 72
+    inc   edx                 
+    cmp   dl, 72
     jnz   tf_l1 
     ; add key
-    call  addkey
+    call  addkeyx
     popad
     ret
 

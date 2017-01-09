@@ -101,8 +101,8 @@
    
 // for 256-bit keys
 typedef struct{
-  uint64_t k[8];
-  uint64_t t[4];
+  uint64_t k[5];
+  uint64_t t[3];
 } threefish_ctx_t;
 
 #ifdef __cplusplus
@@ -110,6 +110,7 @@ extern "C" {
 #endif
 
   void threefish_setkey (threefish_ctx_t*, const void*, const void*);
+  void threefish_setkeyx (threefish_ctx_t*, const void*, const void*);
   void threefish_encrypt (const threefish_ctx_t*, void*, uint32_t);
 
 #ifdef __cplusplus
