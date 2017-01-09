@@ -32,7 +32,7 @@
 ; -----------------------------------------------
 ; Threefish-256 block cipher in x86 assembly
 ;
-; size: 365 bytes
+; size: 371 bytes
 ;
 ; global calls use cdecl convention
 ;
@@ -43,9 +43,6 @@
     %ifndef BIN
       global _threefish_setkeyx
       global _threefish_encryptx
-      global _permutex
-      global _mixx
-      global _addkeyx
     %endif
     
 struc pushad_t
@@ -71,8 +68,6 @@ endstruc
 %define x5 mm5
 %define x6 mm6
 %define x7 mm7
-    
-%define r ebp
     
 threefish_setkeyx:
 _threefish_setkeyx:
@@ -134,8 +129,7 @@ rotl64:
 ;    void *data, 
 ;    uint8_t rc[], 
 ;    int rnd, int enc)
-mixx:
-_mixx:
+mix:
     pushad
     xor    eax, eax
 m_l0:    
@@ -146,7 +140,7 @@ m_l0:
     mov    edi, edx
     and    edi, 7
     lea    edi, [edi+eax*4] 
-    movzx  edi, byte[ebx+edi]
+    movzx  edi, byte[ebp+edi]
     jecxz  m_l1
     
     sub    edi, 64
@@ -170,8 +164,7 @@ m_l2:
     ret
     
 ; void permute(void *data)    
-permutex:
-_permutex:
+permute:
     movq   x0, [esi+1*8]
     movq   x1, [esi+3*8]
 
@@ -182,8 +175,7 @@ _permutex:
 ; void addkey(const threefish_ctx_t *c, 
 ;    void *data, uint8_t s, 
 ;    uint64_t enc)
-addkeyx:
-_addkeyx:
+addkey:
     pushad
 
     pxor    x3, x3           ; x3 = 0 
@@ -256,20 +248,23 @@ _threefish_encryptx
     lodsd
     cdq
     xchg   eax, ecx
+    xor    ebx, ebx
     pop    esi
     push   1
     pop    eax
-    call   tf_lx
-    dd     0x0517340E, 0x203A2E19 
-    dd     0x25283910, 0x20160C21
-tf_lx:
-    pop    ebx
+    ; load rotation constants
+    push   0x20160C21
+    push   0x25283910
+    push   0x203A2E19
+    push   0x0517340E
+    mov    ebp, esp
     jecxz  tf_l1
     
-    neg    eax               ; eax = -1
+    neg    eax               ; ofs = -1
+    mov    bl, 18            ; s   = 18
     pushad
-    mov    esi, ebx
-    mov    edi, ebx
+    mov    esi, ebp
+    mov    edi, ebp
 tf_l0:    
     lodsd
     xchg   eax, ebx
@@ -280,32 +275,33 @@ tf_l0:
     bswap  eax
     stosd
     dec    edx
-    jnp    tf_l0
+    jp     tf_l0
     popad
     ; apply 72 rounds
 tf_l1:    
     ; add key every 4 rounds
     test  dl, 3
     jnz   tf_l2
-    call  addkeyx
-    add   ebp, eax
+    call  addkey
+    add   ebx, eax
 tf_l2:    
     ; permute if decrypting
     jecxz tf_l3    
-    call  permutex
+    call  permute
 tf_l3:    
     ; apply mixing function
-    call  mixx
+    call  mix
     ; permute if encrypting
     test  ecx, ecx
-    jz    tf_l4
-    call  permutex
+    jnz   tf_l4
+    call  permute
 tf_l4:    
     inc   edx                 
     cmp   dl, 72
     jnz   tf_l1 
     ; add key
-    call  addkeyx
+    call  addkey
+    add   esp, 16
     popad
     ret
 
